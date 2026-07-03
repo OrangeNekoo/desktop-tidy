@@ -302,15 +302,18 @@ class WindowController:
         if self._icon_mgr is None:
             return
         wx, wy = self._get_window_pos()
-        x = wx + self._border_x
-        y = wy + self._border_y
+        x = wx + self._border_x + self.MARGIN
+        y = wy + self._border_y + self.MARGIN
         self._icon_mgr.arrange_grid(x, y)
 
+
+    # 安全边距：防止边框测量误差导致图标从窗口边缘漏出
+    MARGIN = 8
     def resize_to_cover(self, grid_w: int, grid_h: int):
-        """调整窗口大小以覆盖图标网格（含边框），保持左上角不变"""
+        """调整窗口大小以覆盖图标网格（含边框+安全边距），保持左上角不变"""
         wx, wy = self._get_window_pos()
-        total_w = grid_w + self._border_x + self._border_r
-        total_h = grid_h + self._border_y + self._border_b
+        total_w = grid_w + self._border_x + self._border_r + self.MARGIN * 2
+        total_h = grid_h + self._border_y + self._border_b + self.MARGIN * 2
         self.root.geometry(f'{total_w}x{total_h}+{wx}+{wy}')
 
 # ── GUI 主应用 ──
@@ -525,8 +528,8 @@ class DesktopTidyApp:
         # 重新测量边框（首次调用时窗口装饰可能尚未完全创建）
         self.win_ctrl._measure_borders()
         wx, wy = self.win_ctrl._get_window_pos()
-        x = wx + self.win_ctrl._border_x
-        y = wy + self.win_ctrl._border_y
+        x = wx + self.win_ctrl._border_x + self.win_ctrl.MARGIN
+        y = wy + self.win_ctrl._border_y + self.win_ctrl.MARGIN
 
         grid_w, grid_h = self.icon_mgr.arrange_grid(x, y)
 
