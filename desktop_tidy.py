@@ -211,6 +211,12 @@ class IconManager:
         grid_h = rows * spacing_h
         return (grid_w, grid_h)
 
+
+    def redraw(self):
+        """强制桌面重绘图标"""
+        user32 = ctypes.windll.user32
+        user32.InvalidateRect(self.listview, None, True)
+        user32.UpdateWindow(self.listview)
 # ── WindowController ──
 class WindowController:
     """管理窗口置顶、反最小化、拖动完成后图标的跟随"""
@@ -298,13 +304,14 @@ class WindowController:
         self._debounce_id = self.root.after(500, self._on_drag_end)
 
     def _on_drag_end(self):
-        """拖动停止后触发：将图标排列到窗口客户区下方"""
+        """拖动停止后触发：将图标排列到窗口客户区下方并强制重绘"""
         if self._icon_mgr is None:
             return
         wx, wy = self._get_window_pos()
         x = wx + self._border_x + self.MARGIN
         y = wy + self._border_y + self.MARGIN
         self._icon_mgr.arrange_grid(x, y)
+        self._icon_mgr.redraw()
 
 
     # 安全边距：防止边框测量误差导致图标从窗口边缘漏出
