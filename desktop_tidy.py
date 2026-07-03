@@ -382,7 +382,8 @@ class DesktopTidyApp:
             self._build_progress_view()
         elif self.state == self.STATE_DONE:
             self._build_done_view()
-            # 重新将图标盖到窗口下（窗口内容大小可能因语言变化）
+            # 等待窗口重建完成再重新覆盖图标
+            self.root.update_idletasks()
             self._hide_icons()
 
     def _center_window(self, w: int, h: int):
