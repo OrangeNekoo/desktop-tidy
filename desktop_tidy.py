@@ -210,3 +210,65 @@ class IconManager:
         grid_w = cols * spacing_w
         grid_h = rows * spacing_h
         return (grid_w, grid_h)
+
+# ── WindowController ──
+class WindowController:
+    """管理窗口置顶、反最小化、拖动完成后图标的跟随"""
+
+    def __init__(self, root: tk.Tk):
+        self.root = root
+        self._icon_mgr = None  # IconManager 引用，enable_drag_follow 时设置
+        self._debounce_id: str | None = None
+        self._topmost_timer: str | None = None
+
+    def pin_top(self):
+        """置顶窗口并定时刷新"""
+        self.root.wm_attributes('-topmost', True)
+        self.root.lift()
+        self._topmost_timer = self.root.after(500, self._refresh_topmost)
+
+    def _refresh_topmost(self):
+        self.root.wm_attributes('-topmost', True)
+        self.root.lift()
+        self._topmost_timer = self.root.after(500, self._refresh_topmost)
+
+    def unpin_top(self):
+        """取消置顶"""
+        if self._topmost_timer:
+            self.root.after_cancel(self._topmost_timer)
+            self._topmost_timer = None
+
+    def block_minimize(self):
+        """阻止最小化"""
+        self.root.bind('<Unmap>', self._on_unmap)
+
+    def _on_unmap(self, event):
+        if event.widget is self.root and self.root.state() == 'iconic':
+            self.root.after(1, self.root.deiconify)
+            self.root.after(2, self.root.lift)
+
+    def enable_drag_follow(self, icon_mgr):
+        """启用拖动完成后图标跟随，icon_mgr 为 IconManager 实例"""
+        self._icon_mgr = icon_mgr
+        self.root.bind('<Configure>', self._on_configure)
+
+    def _on_configure(self, event):
+        if event.widget is not self.root:
+            return
+        if self._debounce_id:
+            self.root.after_cancel(self._debounce_id)
+        self._debounce_id = self.root.after(300, self._on_drag_end)
+
+    def _on_drag_end(self):
+        """拖动停止 300ms 后触发：将图标排列到窗口下方"""
+        if self._icon_mgr is None:
+            return
+        x = self.root.winfo_x()
+        y = self.root.winfo_y()
+        self._icon_mgr.arrange_grid(x, y)
+
+    def resize_to_cover(self, w: int, h: int):
+        """调整窗口大小以覆盖图标网格，保持左上角不变"""
+        x = self.root.winfo_x()
+        y = self.root.winfo_y()
+        self.root.geometry(f'{w}x{h}+{x}+{y}')
