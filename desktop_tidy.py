@@ -77,6 +77,8 @@ LVM_GETITEMPOSITION = LVM_FIRST + 16
 LVM_SETITEMPOSITION = LVM_FIRST + 15
 LVM_GETITEMSPACING = LVM_FIRST + 51
 LVS_AUTOARRANGE = 0x0100
+LVM_GETEXTENDEDLISTVIEWSTYLE = LVM_FIRST + 55
+LVS_EX_SNAPTOGRID = 0x00080000
 GWL_STYLE = -16
 
 # ── IconManager ──
@@ -220,9 +222,9 @@ class IconManager:
         return bool(style & LVS_AUTOARRANGE)
 
     def has_align_to_grid(self) -> bool:
-        """查询桌面 ListView 的 LVS_ALIGNTOP 样式（网格对齐）"""
-        style = ctypes.windll.user32.GetWindowLongW(self.listview, GWL_STYLE)
-        return bool(style & 0x0010)  # LVS_ALIGNTOP
+        """查询桌面 ListView 的 LVS_EX_SNAPTOGRID 扩展样式"""
+        ex_style = ctypes.windll.user32.SendMessageW(self.listview, LVM_GETEXTENDEDLISTVIEWSTYLE, 0, 0)
+        return bool(ex_style & LVS_EX_SNAPTOGRID)
 
     def redraw(self):
         """强制桌面重绘图标"""
