@@ -469,18 +469,16 @@ class DesktopTidyApp:
                 winreg.HKEY_CURRENT_USER,
                 r"Software\Microsoft\Windows\Shell\Bags\1\Desktop"
             )
-            fflags, ftype = winreg.QueryValueEx(key, "FFlags")
+            fflags, _ = winreg.QueryValueEx(key, "FFlags")
             winreg.CloseKey(key)
-            print(f"[DEBUG] FFlags={fflags:#x}, type={ftype}")
             return fflags
-        except Exception as e:
-            print(f"[DEBUG] _get_desktop_fflags failed: {e}")
+        except Exception:
             return None
 
     def _check_auto_arrange(self) -> bool:
         """强检测：自动排列图标开启则弹窗并返回 True"""
         fflags = self._get_desktop_fflags()
-        if fflags is not None and fflags & 0x1:
+        if fflags is not None and fflags & 0x4:
             messagebox.showwarning(
                 self.t("window_title"),
                 self.t("auto_arrange_warn")
@@ -491,7 +489,7 @@ class DesktopTidyApp:
     def _check_align_to_grid(self) -> bool:
         """弱检测：网格对齐开启返回 True（不弹窗，仅显示提示）"""
         fflags = self._get_desktop_fflags()
-        return fflags is not None and bool(fflags & 0x2)
+        return fflags is not None and bool(fflags & 0x20)
 
     # ── PROGRESS 视图 ──
     def _build_progress_view(self):
