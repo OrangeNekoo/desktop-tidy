@@ -75,7 +75,6 @@ LVM_GETITEMCOUNT = LVM_FIRST + 4
 LVM_GETITEMPOSITION = LVM_FIRST + 16
 LVM_SETITEMPOSITION = LVM_FIRST + 15
 LVM_GETITEMSPACING = LVM_FIRST + 51
-LVM_GETITEMRECT = LVM_FIRST + 14
 
 # ── IconManager ──
 class IconManager:
@@ -187,24 +186,6 @@ class IconManager:
         if w == 0 or h == 0:
             return (75, 75)
         return (w, h)
-
-    def get_max_item_width(self) -> int:
-        """返回所有图标中最大的宽度（含文件名标签），用于计算窗口覆盖宽度"""
-        count = self.get_icon_count()
-        if count == 0:
-            return 0
-        max_w = 0
-        user32 = ctypes.windll.user32
-        rect = wintypes.RECT()
-        for i in range(count):
-            # LVIR_BOUNDS (0) = 整个图标+标签的包围矩形
-            user32.SendMessageW(self.listview, LVM_GETITEMRECT, i,
-                                wintypes.LPARAM(ctypes.addressof(rect)))
-            w = rect.right - rect.left
-            if w > max_w:
-                max_w = w
-        return max_w
-
     def arrange_grid(self, origin_x: int, origin_y: int) -> tuple[int, int]:
         """
         将所有图标排列成最小包围矩形网格，以 (origin_x, origin_y) 为左上角原点。
@@ -228,11 +209,6 @@ class IconManager:
         rows = math.ceil(count / cols)
         grid_w = cols * spacing_w
         grid_h = rows * spacing_h
-
-        # 强制桌面重绘，避免图标位置不更新
-        user32 = ctypes.windll.user32
-        user32.InvalidateRect(self.listview, None, True)
-        user32.UpdateWindow(self.listview)
         return (grid_w, grid_h)
 
 # ── WindowController ──
@@ -541,13 +517,12 @@ class DesktopTidyApp:
         x = self.root.winfo_x() + self.win_ctrl._border_x
         y = self.root.winfo_y() + self.win_ctrl._border_y
 
-        # 先测量图标最大宽度（排列前查询 ListView 避免状态不一致）
-        item_w = self.icon_mgr.get_max_item_width()
-
         grid_w, grid_h = self.icon_mgr.arrange_grid(x, y)
 
         if grid_w > 0 and grid_h > 0:
-            effective_w = max(grid_w, item_w)
+            # 额外加一列图标间距作为宽度边距，确保长文件名也被遮住
+            pad_w, _ = self.icon_mgr.get_icon_spacing()
+            effective_w = grid_w + pad_w
             self.win_ctrl.cancel_debounce()
             self.win_ctrl.resize_to_cover(effective_w, grid_h)
 
