@@ -198,7 +198,8 @@ class IconManager:
         rect = wintypes.RECT()
         for i in range(count):
             # LVIR_BOUNDS (0) = 整个图标+标签的包围矩形
-            user32.SendMessageW(self.listview, LVM_GETITEMRECT, i, ctypes.addressof(rect))
+            user32.SendMessageW(self.listview, LVM_GETITEMRECT, i,
+                                wintypes.LPARAM(ctypes.addressof(rect)))
             w = rect.right - rect.left
             if w > max_w:
                 max_w = w
