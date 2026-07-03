@@ -8,7 +8,6 @@ import ctypes
 from ctypes import wintypes
 import random
 import math
-import locale
 
 # ── 国际化 ──
 TEXTS = {
@@ -58,8 +57,10 @@ RAINBOW_COLORS = [
 def detect_system_language() -> str:
     """检测系统语言，中文返回 'zh'，否则返回 'en'"""
     try:
-        lang, _ = locale.getdefaultlocale()
-        if lang and lang.startswith("zh"):
+        # 使用 Win32 API 替代已弃用的 locale.getdefaultlocale()
+        lang_id = ctypes.windll.kernel32.GetUserDefaultUILanguage()
+        # 0x0804 = 简体中文, 0x0404 = 繁体中文
+        if lang_id in (0x0804, 0x0404):
             return "zh"
     except Exception:
         pass
