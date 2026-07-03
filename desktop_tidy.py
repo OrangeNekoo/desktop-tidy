@@ -225,10 +225,14 @@ class IconManager:
                 self.set_icon_position(i, x, y)
             except Exception:
                 pass  # 单个图标移动失败不中断整体排列
-
         rows = math.ceil(count / cols)
         grid_w = cols * spacing_w
         grid_h = rows * spacing_h
+
+        # 强制桌面重绘，避免图标位置不更新
+        user32 = ctypes.windll.user32
+        user32.InvalidateRect(self.listview, None, True)
+        user32.UpdateWindow(self.listview)
         return (grid_w, grid_h)
 
 # ── WindowController ──
@@ -536,11 +540,13 @@ class DesktopTidyApp:
         """将图标排列到窗口客户区下方并调整窗口大小"""
         x = self.root.winfo_x() + self.win_ctrl._border_x
         y = self.root.winfo_y() + self.win_ctrl._border_y
+
+        # 先测量图标最大宽度（排列前查询 ListView 避免状态不一致）
+        item_w = self.icon_mgr.get_max_item_width()
+
         grid_w, grid_h = self.icon_mgr.arrange_grid(x, y)
 
         if grid_w > 0 and grid_h > 0:
-            # 用图标实际最大宽度（含文件名）替代网格宽度，确保长文件名也被遮住
-            item_w = self.icon_mgr.get_max_item_width()
             effective_w = max(grid_w, item_w)
             self.win_ctrl.cancel_debounce()
             self.win_ctrl.resize_to_cover(effective_w, grid_h)
