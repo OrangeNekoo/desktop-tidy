@@ -9,6 +9,9 @@ from ctypes import wintypes
 import random
 import math
 
+# 确保 DPI 感知，获取虚拟屏幕坐标而非逻辑坐标
+ctypes.windll.user32.SetProcessDPIAware()
+
 # ── 国际化 ──
 TEXTS = {
     "zh": {
