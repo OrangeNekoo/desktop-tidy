@@ -514,6 +514,8 @@ class DesktopTidyApp:
 
     def _hide_icons(self):
         """将图标排列到窗口客户区下方并调整窗口大小"""
+        # 重新测量边框（首次调用时窗口装饰可能尚未完全创建）
+        self.win_ctrl._measure_borders()
         x = self.root.winfo_x() + self.win_ctrl._border_x
         y = self.root.winfo_y() + self.win_ctrl._border_y
 
