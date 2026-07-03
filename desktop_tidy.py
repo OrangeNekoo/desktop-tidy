@@ -8,7 +8,7 @@ import ctypes
 from ctypes import wintypes
 import random
 import math
-
+import winreg
 # 确保 DPI 感知，获取虚拟屏幕坐标而非逻辑坐标
 ctypes.windll.user32.SetProcessDPIAware()
 
@@ -309,8 +309,8 @@ class DesktopTidyApp:
         self._center_window(400, 200)
 
     def t(self, key: str, **fmt) -> str:
-        """获取当前语言的文本"""
-        text = TEXTS[self.lang][key]
+        """获取当前语言的文本，缺失 key 时回退到 key 本身"""
+        text = TEXTS[self.lang].get(key, TEXTS["en"].get(key, key))
         if fmt:
             text = text.format(**fmt)
         return text
@@ -335,6 +335,9 @@ class DesktopTidyApp:
 
     def _rebuild_ui(self):
         """语言切换后重建界面"""
+        # 销毁旧菜单防止内存泄漏
+        if hasattr(self, '_lang_menu'):
+            self._lang_menu.destroy()
         for widget in list(self.root.winfo_children()):
             if isinstance(widget, tk.Menu):
                 continue
@@ -396,7 +399,6 @@ class DesktopTidyApp:
     def _check_auto_arrange(self) -> bool:
         """检查桌面是否开启了自动排列/网格对齐，开启则弹窗返回 True"""
         try:
-            import winreg
             key = winreg.OpenKey(
                 winreg.HKEY_CURRENT_USER,
                 r"Software\Microsoft\Windows\Shell\Bags\1\Desktop"
@@ -409,7 +411,8 @@ class DesktopTidyApp:
                     self.t("auto_arrange_warn")
                 )
                 return True
-        except Exception:
+        except (FileNotFoundError, OSError):
+            # 注册表键不存在或无法访问，忽略
             pass
         return False
 
@@ -493,6 +496,11 @@ class DesktopTidyApp:
 
     # ── 关闭 ──
     def _on_close(self):
+        # 清理所有挂起的 after 定时器防止 TclError
+        if self._progress_after_id:
+            self.root.after_cancel(self._progress_after_id)
+            self._progress_after_id = None
+        self.win_ctrl.unpin_top()
         self.root.destroy()
 
     def run(self):
