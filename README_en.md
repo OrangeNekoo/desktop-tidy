@@ -1,45 +1,29 @@
 # Desktop Tidy Master
 
-A prank desktop tidying tool. Click a button to pretend to "tidy" your desktop — after a progress bar animation, it hides all your desktop icons beneath the window.
+A prank app. Click a button, watch a progress bar for a few seconds, and all your desktop icons disappear — neatly tucked under the window where you can't find them.
 
-## Features
+## What it does
 
-- **Rainbow Title** — Title text rendered with rainbow gradient colors (red to violet) in IDLE state
-- **Progress Bar Animation** — 4-step status rotation with randomized duration (4-7 seconds), faking real work
-- **Icon Hiding** — After the progress bar completes, all desktop icons are neatly arranged and hidden beneath the window
-- **Always-on-Top & Anti-Minimize** — Window stays on top after completion; minimization is blocked and auto-restored
-- **Drag Follow** — After dragging the window, icons automatically re-align beneath it
-- **Language Switching (Chinese/English)** — Real-time UI language toggle via menu bar
-- **Auto-Arrange Detection** — On startup, detects if "Auto arrange icons" is enabled on the desktop and shows a warning dialog
+Open it up, you get a rainbow-colored "Click the button to start tidying" label. Click, and a progress bar runs for 4–7 seconds, cycling through "Preparing to tidy...", "Analyzing desktop...", "Invoking Homo Silver Dream LLM...", "Tidying complete!". Then the window shrinks to exactly cover the icons, and they're gone.
 
-## Usage
+The window stays on top, won't minimize (it bounces right back), and closing the app does not restore your icons. You figure it out.
+
+If "Auto arrange icons" is turned on, it warns you to disable it first.
+
+Menu bar has Chinese/English switching.
+
+## Running it
 
 ```bash
 python desktop_tidy.py
 ```
 
-## Requirements
+Windows 10 / 11, Python 3.10+. Zero third-party deps — just tkinter, ctypes, winreg, all standard library.
 
-- Windows 10 / Windows 11
-- Python 3.10+
+## Disclaimer
 
-## Dependencies
-
-Zero third-party dependencies. Uses only the Python standard library:
-
-| Module | Purpose |
-|--------|---------|
-| `tkinter` / `tkinter.ttk` | GUI |
-| `ctypes` | Windows API calls |
-| `random` | Randomized progress bar duration |
-| `math` | Icon grid layout calculation |
-| `locale` | System language detection |
-| `winreg` | Registry access (auto-arrange detection) |
-
-## Warning
-
-**This software moves your desktop icons and does NOT restore them!** Before closing the window, make sure you have manually dragged the icons back to their original positions, or be aware of where they are. The program does not restore icon positions on exit.
+This app really moves your desktop icons and does not put them back on exit. Don't open it on your work machine unless you know what you're doing.
 
 ## License
 
-MIT License. Copyright (c) 2026 OrangeNeko.
+MIT
