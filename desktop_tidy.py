@@ -127,10 +127,9 @@ class IconManager:
             self._listview = result
             return result
 
-        # 方案 3: Shell_TrayWnd → 递归找 SysListView32 (Win11 24H2+)
-        shell = user32.FindWindowW("Shell_TrayWnd", None)
-        if shell:
-            result = self._find_listview_recursive(shell, class_name, user32)
+        # 方案 3: Progman 子树递归搜索 (Win11 24H2+ 图标在 DesktopWindowXamlSource 下)
+        if progman:
+            result = self._find_listview_recursive(progman, class_name, user32)
         if result:
             self._listview = result
         return result
@@ -171,7 +170,7 @@ class IconManager:
 
     def set_icon_position(self, idx: int, x: int, y: int):
         """设置单个图标位置"""
-        lparam = (y << 16) | (x & 0xFFFF)
+        lparam = ((y & 0xFFFF) << 16) | (x & 0xFFFF)
         ctypes.windll.user32.SendMessageW(
             self.listview, LVM_SETITEMPOSITION, idx, lparam
         )
@@ -179,7 +178,7 @@ class IconManager:
     def get_icon_spacing(self) -> tuple[int, int]:
         """获取图标间距 (宽, 高)，含图标+标签的实际占用"""
         spacing = ctypes.windll.user32.SendMessageW(
-            self.listview, LVM_GETITEMSPACING, 1, 0
+            self.listview, LVM_GETITEMSPACING, 0, 0  # 0 = 大图标模式
         )
         w = spacing & 0xFFFF
         h = (spacing >> 16) & 0xFFFF
@@ -204,7 +203,10 @@ class IconManager:
             row = i // cols
             x = origin_x + col * spacing_w
             y = origin_y + row * spacing_h
-            self.set_icon_position(i, x, y)
+            try:
+                self.set_icon_position(i, x, y)
+            except Exception:
+                pass  # 单个图标移动失败不中断整体排列
 
         rows = math.ceil(count / cols)
         grid_w = cols * spacing_w
@@ -247,6 +249,12 @@ class WindowController:
             self.root.after(1, self.root.deiconify)
             self.root.after(2, self.root.lift)
 
+
+    def cancel_debounce(self):
+        """取消防抖定时器（供 DesktopTidyApp 在 resize 前调用）"""
+        if self._debounce_id:
+            self.root.after_cancel(self._debounce_id)
+            self._debounce_id = None
     def enable_drag_follow(self, icon_mgr):
         """启用拖动完成后图标跟随，icon_mgr 为 IconManager 实例"""
         self._icon_mgr = icon_mgr
@@ -349,6 +357,8 @@ class DesktopTidyApp:
             self._build_progress_view()
         elif self.state == self.STATE_DONE:
             self._build_done_view()
+            # 重新将图标盖到窗口下（窗口内容大小可能因语言变化）
+            self._hide_icons()
 
     def _center_window(self, w: int, h: int):
         sw = self.root.winfo_screenwidth()
@@ -484,10 +494,7 @@ class DesktopTidyApp:
         grid_w, grid_h = self.icon_mgr.arrange_grid(x, y)
 
         if grid_w > 0 and grid_h > 0:
-            # 取消防抖定时器防止 resize_to_cover 触发不必要的 arrange_grid
-            if self.win_ctrl._debounce_id:
-                self.root.after_cancel(self.win_ctrl._debounce_id)
-                self.win_ctrl._debounce_id = None
+            self.win_ctrl.cancel_debounce()
             self.win_ctrl.resize_to_cover(grid_w, grid_h)
 
         self.win_ctrl.pin_top()
@@ -500,6 +507,7 @@ class DesktopTidyApp:
         if self._progress_after_id:
             self.root.after_cancel(self._progress_after_id)
             self._progress_after_id = None
+        self.win_ctrl.cancel_debounce()
         self.win_ctrl.unpin_top()
         self.root.destroy()
 
