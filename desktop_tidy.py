@@ -300,11 +300,11 @@ class WindowController:
         y = self.root.winfo_y() + self._border_y
         self._icon_mgr.arrange_grid(x, y)
 
-    def resize_to_cover(self, grid_w: int, grid_h: int):
-        """调整窗口大小以覆盖图标网格（含边框），保持左上角不变"""
+    def resize_to_cover(self, grid_w: int, grid_h: int, extra_w: int = 100):
+        """调整窗口大小以覆盖图标网格（含边框和标签额外宽度），保持左上角不变"""
         x = self.root.winfo_x()
         y = self.root.winfo_y()
-        total_w = grid_w + self._border_x + self._border_r
+        total_w = grid_w + extra_w + self._border_x + self._border_r
         total_h = grid_h + self._border_y + self._border_b
         self.root.geometry(f'{total_w}x{total_h}+{x}+{y}')
 
