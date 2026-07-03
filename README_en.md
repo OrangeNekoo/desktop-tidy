@@ -1,3 +1,5 @@
+[中文](README.md)
+
 # Desktop Tidy Master
 
 A prank app. Click a button, watch a progress bar for a few seconds, and all your desktop icons disappear — neatly tucked under the window where you can't find them.
@@ -51,4 +53,4 @@ This app really moves your desktop icons and does not put them back on exit. Don
 
 ## License
 
-MIT
+[MIT](https://github.com/OrangeNekoo/desktop-tidy/blob/main/LICENSE)

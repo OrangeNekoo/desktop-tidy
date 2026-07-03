@@ -1,3 +1,5 @@
+[English](README_en.md)
+
 # 桌面整理大师
 
 一个整蛊软件。点一下按钮，进度条滚几秒，然后你桌面上所有图标就没了——它们被整齐地塞到窗口底下，找不到了。
@@ -51,4 +53,4 @@ pyinstaller --onefile --windowed --icon=images/app_icon.ico desktop_tidy.py
 
 ## License
 
-MIT
+[MIT](https://github.com/OrangeNekoo/desktop-tidy/blob/main/LICENSE)
