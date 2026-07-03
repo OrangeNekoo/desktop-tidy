@@ -272,3 +272,234 @@ class WindowController:
         x = self.root.winfo_x()
         y = self.root.winfo_y()
         self.root.geometry(f'{w}x{h}+{x}+{y}')
+
+# ── GUI 主应用 ──
+class DesktopTidyApp:
+    """主应用：状态机 + tkinter GUI"""
+
+    STATE_IDLE = "idle"
+    STATE_PROGRESS = "progress"
+    STATE_DONE = "done"
+
+    def __init__(self):
+        self.state = self.STATE_IDLE
+        self.lang = detect_system_language()
+        self._progress_segments = 4
+        self._progress_interval = 0
+        self._progress_idx = 0
+        self._progress_value = 0.0
+        self._progress_after_id: str | None = None
+        self._icon_count = 0
+
+        # 窗口
+        self.root = tk.Tk()
+        self.root.title(self.t("window_title"))
+        self.root.resizable(True, True)
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        # 窗口控制器
+        self.win_ctrl = WindowController(self.root)
+
+        # 图标管理器
+        self.icon_mgr = IconManager()
+
+        # 构建 UI
+        self._build_menu()
+        self._build_idle_view()
+        self._center_window(400, 200)
+
+    def t(self, key: str, **fmt) -> str:
+        """获取当前语言的文本"""
+        text = TEXTS[self.lang][key]
+        if fmt:
+            text = text.format(**fmt)
+        return text
+
+    def _build_menu(self):
+        menubar = tk.Menu(self.root)
+        lang_menu = tk.Menu(menubar, tearoff=0)
+        lang_menu.add_command(label=self.t("menu_lang_zh"),
+                              command=lambda: self._switch_lang("zh"))
+        lang_menu.add_command(label=self.t("menu_lang_en"),
+                              command=lambda: self._switch_lang("en"))
+        menubar.add_cascade(label=self.t("menu_lang"), menu=lang_menu)
+        self.root.config(menu=menubar)
+        self._lang_menu = lang_menu
+
+    def _switch_lang(self, lang: str):
+        if lang == self.lang:
+            return
+        self.lang = lang
+        self.root.title(self.t("window_title"))
+        self._rebuild_ui()
+
+    def _rebuild_ui(self):
+        """语言切换后重建界面"""
+        for widget in list(self.root.winfo_children()):
+            if isinstance(widget, tk.Menu):
+                continue
+            widget.destroy()
+        self._build_menu()
+        if self.state == self.STATE_IDLE:
+            self._build_idle_view()
+        elif self.state == self.STATE_PROGRESS:
+            self._build_progress_view()
+        elif self.state == self.STATE_DONE:
+            self._build_done_view()
+
+    def _center_window(self, w: int, h: int):
+        sw = self.root.winfo_screenwidth()
+        sh = self.root.winfo_screenheight()
+        x = (sw - w) // 2
+        y = (sh - h) // 2
+        self.root.geometry(f'{w}x{h}+{x}+{y}')
+
+    # ── IDLE 视图 ──
+    def _build_idle_view(self):
+        """彩虹标签 + 开始整理按钮"""
+        frame = ttk.Frame(self.root, padding=20)
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        label_text = self.t("idle_label")
+        canvas = tk.Canvas(frame, height=40, highlightthickness=0)
+        canvas.pack(pady=(10, 20))
+        self._idle_canvas = canvas
+
+        x_offset = 10
+        for i, ch in enumerate(label_text):
+            color = RAINBOW_COLORS[i % len(RAINBOW_COLORS)]
+            canvas.create_text(x_offset, 20, text=ch, fill=color,
+                               font=("Microsoft YaHei", 14, "bold"), anchor="w")
+            x_offset += 18
+
+        btn = ttk.Button(frame, text=self.t("start_btn"),
+                         command=self._on_start)
+        btn.pack()
+        self._idle_btn = btn
+
+    def _on_start(self):
+        """点击开始整理"""
+        if self._check_auto_arrange():
+            return
+        if self.icon_mgr.find_listview() is None:
+            messagebox.showerror(
+                self.t("window_title"),
+                self.t("no_desktop")
+            )
+            self.root.destroy()
+            return
+
+        self.state = self.STATE_PROGRESS
+        self._rebuild_ui()
+        self._start_progress()
+
+    def _check_auto_arrange(self) -> bool:
+        """检查桌面是否开启了自动排列/网格对齐，开启则弹窗返回 True"""
+        try:
+            import winreg
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\Shell\Bags\1\Desktop"
+            )
+            fflags, _ = winreg.QueryValueEx(key, "FFlags")
+            winreg.CloseKey(key)
+            if fflags & 0x4 or fflags & 0x20:
+                messagebox.showwarning(
+                    self.t("window_title"),
+                    self.t("auto_arrange_warn")
+                )
+                return True
+        except Exception:
+            pass
+        return False
+
+    # ── PROGRESS 视图 ──
+    def _build_progress_view(self):
+        frame = ttk.Frame(self.root, padding=20)
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        self._progress_label = ttk.Label(frame, text=self.t("progress_1"),
+                                         font=("Microsoft YaHei", 12))
+        self._progress_label.pack(pady=(10, 20))
+
+        self._progress_bar = ttk.Progressbar(
+            frame, mode='determinate', length=300
+        )
+        self._progress_bar.pack()
+        self._progress_bar['value'] = 0
+
+    def _start_progress(self):
+        """开始进度条动画"""
+        total_ms = int(random.uniform(4.0, 7.0) * 1000)
+        self._progress_interval = total_ms / self._progress_segments
+        self._progress_idx = 0
+        self._progress_value = 0.0
+        self._tick_progress()
+
+    def _tick_progress(self):
+        step = 100.0 / self._progress_segments
+        labels = ["progress_1", "progress_2", "progress_3", "progress_4"]
+
+        if self._progress_idx < self._progress_segments:
+            self._progress_label.config(text=self.t(labels[self._progress_idx]))
+            self._progress_value += step
+            self._progress_bar['value'] = min(self._progress_value, 100)
+            self._progress_idx += 1
+            self._progress_after_id = self.root.after(
+                int(self._progress_interval), self._tick_progress
+            )
+        else:
+            self._on_progress_done()
+
+    def _on_progress_done(self):
+        """进度条完成 → 进入 DONE 状态"""
+        self._icon_count = self.icon_mgr.get_icon_count()
+        self.state = self.STATE_DONE
+        self._rebuild_ui()
+        self._hide_icons()
+
+    # ── DONE 视图 ──
+    def _build_done_view(self):
+        """仅显示整理完成标签"""
+        frame = ttk.Frame(self.root, padding=10)
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        label = ttk.Label(
+            frame,
+            text=self.t("done_label", count=self._icon_count),
+            font=("Microsoft YaHei", 11),
+            wraplength=380,
+            justify=tk.CENTER,
+        )
+        label.pack(pady=5)
+        self._done_label = label
+
+    def _hide_icons(self):
+        """将图标排列到窗口下方并调整窗口大小"""
+        x = self.root.winfo_x()
+        y = self.root.winfo_y()
+        grid_w, grid_h = self.icon_mgr.arrange_grid(x, y)
+
+        if grid_w > 0 and grid_h > 0:
+            # 取消防抖定时器防止 resize_to_cover 触发不必要的 arrange_grid
+            if self.win_ctrl._debounce_id:
+                self.root.after_cancel(self.win_ctrl._debounce_id)
+                self.win_ctrl._debounce_id = None
+            self.win_ctrl.resize_to_cover(grid_w, grid_h)
+
+        self.win_ctrl.pin_top()
+        self.win_ctrl.block_minimize()
+        self.win_ctrl.enable_drag_follow(self.icon_mgr)
+
+    # ── 关闭 ──
+    def _on_close(self):
+        self.root.destroy()
+
+    def run(self):
+        self.root.mainloop()
+
+
+# ── 入口 ──
+if __name__ == "__main__":
+    app = DesktopTidyApp()
+    app.run()
