@@ -74,7 +74,7 @@ LVM_FIRST = 0x1000
 LVM_GETITEMCOUNT = LVM_FIRST + 4
 LVM_GETITEMPOSITION = LVM_FIRST + 16
 LVM_SETITEMPOSITION = LVM_FIRST + 15
-LVM_GETITEMSPACING = LVM_FIRST + 51
+LVM_GETITEMRECT = LVM_FIRST + 14
 
 # ── IconManager ──
 class IconManager:
@@ -186,6 +186,22 @@ class IconManager:
         if w == 0 or h == 0:
             return (75, 75)
         return (w, h)
+
+    def get_max_item_width(self) -> int:
+        """返回所有图标中最大的宽度（含文件名标签），用于计算窗口覆盖宽度"""
+        count = self.get_icon_count()
+        if count == 0:
+            return 0
+        max_w = 0
+        user32 = ctypes.windll.user32
+        rect = wintypes.RECT()
+        for i in range(count):
+            # LVIR_BOUNDS (0) = 整个图标+标签的包围矩形
+            user32.SendMessageW(self.listview, LVM_GETITEMRECT, i, ctypes.addressof(rect))
+            w = rect.right - rect.left
+            if w > max_w:
+                max_w = w
+        return max_w
 
     def arrange_grid(self, origin_x: int, origin_y: int) -> tuple[int, int]:
         """
@@ -300,11 +316,11 @@ class WindowController:
         y = self.root.winfo_y() + self._border_y
         self._icon_mgr.arrange_grid(x, y)
 
-    def resize_to_cover(self, grid_w: int, grid_h: int, extra_w: int = 100):
-        """调整窗口大小以覆盖图标网格（含边框和标签额外宽度），保持左上角不变"""
+    def resize_to_cover(self, grid_w: int, grid_h: int):
+        """调整窗口大小以覆盖图标网格（含边框），保持左上角不变"""
         x = self.root.winfo_x()
         y = self.root.winfo_y()
-        total_w = grid_w + extra_w + self._border_x + self._border_r
+        total_w = grid_w + self._border_x + self._border_r
         total_h = grid_h + self._border_y + self._border_b
         self.root.geometry(f'{total_w}x{total_h}+{x}+{y}')
 
@@ -521,8 +537,11 @@ class DesktopTidyApp:
         grid_w, grid_h = self.icon_mgr.arrange_grid(x, y)
 
         if grid_w > 0 and grid_h > 0:
+            # 用图标实际最大宽度（含文件名）替代网格宽度，确保长文件名也被遮住
+            item_w = self.icon_mgr.get_max_item_width()
+            effective_w = max(grid_w, item_w)
             self.win_ctrl.cancel_debounce()
-            self.win_ctrl.resize_to_cover(grid_w, grid_h)
+            self.win_ctrl.resize_to_cover(effective_w, grid_h)
 
         self.win_ctrl.pin_top()
         self.win_ctrl.block_minimize()
