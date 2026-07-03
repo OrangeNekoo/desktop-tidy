@@ -469,10 +469,12 @@ class DesktopTidyApp:
                 winreg.HKEY_CURRENT_USER,
                 r"Software\Microsoft\Windows\Shell\Bags\1\Desktop"
             )
-            fflags, _ = winreg.QueryValueEx(key, "FFlags")
+            fflags, ftype = winreg.QueryValueEx(key, "FFlags")
             winreg.CloseKey(key)
+            print(f"[DEBUG] FFlags={fflags:#x}, type={ftype}")
             return fflags
-        except (FileNotFoundError, OSError, TypeError):
+        except Exception as e:
+            print(f"[DEBUG] _get_desktop_fflags failed: {e}")
             return None
 
     def _check_auto_arrange(self) -> bool:
