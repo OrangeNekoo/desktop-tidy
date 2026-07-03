@@ -8,7 +8,6 @@ import ctypes
 from ctypes import wintypes
 import random
 import math
-import winreg
 # 确保 DPI 感知，获取虚拟屏幕坐标而非逻辑坐标
 ctypes.windll.user32.SetProcessDPIAware()
 
@@ -77,6 +76,8 @@ LVM_GETITEMCOUNT = LVM_FIRST + 4
 LVM_GETITEMPOSITION = LVM_FIRST + 16
 LVM_SETITEMPOSITION = LVM_FIRST + 15
 LVM_GETITEMSPACING = LVM_FIRST + 51
+LVS_AUTOARRANGE = 0x0100
+GWL_STYLE = -16
 
 # ── IconManager ──
 class IconManager:
@@ -213,6 +214,15 @@ class IconManager:
         grid_h = rows * spacing_h
         return (grid_w, grid_h)
 
+    def has_auto_arrange(self) -> bool:
+        """直接查询桌面 ListView 的 LVS_AUTOARRANGE 样式"""
+        style = ctypes.windll.user32.GetWindowLongW(self.listview, GWL_STYLE)
+        return bool(style & LVS_AUTOARRANGE)
+
+    def has_align_to_grid(self) -> bool:
+        """查询桌面 ListView 的 LVS_ALIGNTOP 样式（网格对齐）"""
+        style = ctypes.windll.user32.GetWindowLongW(self.listview, GWL_STYLE)
+        return bool(style & 0x0010)  # LVS_ALIGNTOP
 
     def redraw(self):
         """强制桌面重绘图标"""
@@ -461,24 +471,11 @@ class DesktopTidyApp:
         self.state = self.STATE_PROGRESS
         self._rebuild_ui()
         self._start_progress()
-
-    def _get_desktop_fflags(self) -> int | None:
-        """读取桌面 FFlags 注册表值，失败返回 None"""
-        try:
-            key = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                r"Software\Microsoft\Windows\Shell\Bags\1\Desktop"
-            )
-            fflags, _ = winreg.QueryValueEx(key, "FFlags")
-            winreg.CloseKey(key)
-            return fflags
-        except Exception:
-            return None
-
     def _check_auto_arrange(self) -> bool:
         """强检测：自动排列图标开启则弹窗并返回 True"""
-        fflags = self._get_desktop_fflags()
-        if fflags is not None and fflags & 0x4:
+        if self.icon_mgr.find_listview() is None:
+            return False
+        if self.icon_mgr.has_auto_arrange():
             messagebox.showwarning(
                 self.t("window_title"),
                 self.t("auto_arrange_warn")
@@ -488,8 +485,9 @@ class DesktopTidyApp:
 
     def _check_align_to_grid(self) -> bool:
         """弱检测：网格对齐开启返回 True（不弹窗，仅显示提示）"""
-        fflags = self._get_desktop_fflags()
-        return fflags is not None and bool(fflags & 0x20)
+        if self.icon_mgr.find_listview() is None:
+            return False
+        return self.icon_mgr.has_align_to_grid()
 
     # ── PROGRESS 视图 ──
     def _build_progress_view(self):
