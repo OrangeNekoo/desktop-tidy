@@ -277,6 +277,9 @@ class WindowController:
         if event.widget is self.root and self.root.state() == 'iconic':
             self.root.after(1, self.root.deiconify)
             self.root.after(2, self.root.lift)
+            # 恢复后重新绑定 Configure（最大化/最小化可能导致绑定丢失）
+            if self._icon_mgr is not None:
+                self.root.after(50, lambda: self.root.bind('<Configure>', self._on_configure))
 
 
     def _get_window_pos(self) -> tuple[int, int]:
@@ -295,9 +298,10 @@ class WindowController:
         """启用拖动完成后图标跟随，icon_mgr 为 IconManager 实例"""
         self._icon_mgr = icon_mgr
         self.root.bind('<Configure>', self._on_configure)
-
+        # 最大化/最小化恢复后重新绑定 Configure
+        self.root.bind('<Map>', lambda e: self.root.bind('<Configure>', self._on_configure))
     def _on_configure(self, event):
-        if event.widget is not self.root:
+        if self._icon_mgr is None:
             return
         if self._debounce_id:
             self.root.after_cancel(self._debounce_id)
