@@ -231,8 +231,6 @@ class WindowController:
         self._border_r = 0   # 右边框宽度
         self._border_b = 0   # 下边框高度
         self._measure_borders()
-        # 永久绑定 Configure，通过 _icon_mgr 判断是否响应
-        self.root.bind('<Configure>', self._on_configure)
     def _measure_borders(self):
         """测量窗口边框和标题栏尺寸（窗口 realize 后调用）"""
         self.root.update_idletasks()
@@ -278,7 +276,9 @@ class WindowController:
         if event.widget is self.root and self.root.state() == 'iconic':
             self.root.after(1, self.root.deiconify)
             self.root.after(2, self.root.lift)
-
+            # 恢复后重新激活拖动跟随（最小化可能导致绑定丢失）
+            if self._icon_mgr is not None:
+                self.root.after(10, lambda mgr=self._icon_mgr: self.enable_drag_follow(mgr))
     def _get_window_pos(self) -> tuple[int, int]:
         """通过 Win32 API 获取窗口实际屏幕坐标（比 winfo_x/y 更准确）"""
         hwnd = int(self.root.frame(), 16)
@@ -293,18 +293,21 @@ class WindowController:
             self._debounce_id = None
 
     def enable_drag_follow(self, icon_mgr):
-        """启用拖动完成后图标跟随，icon_mgr 为 IconManager 实例"""
+        """启用拖动完成后图标跟随"""
         self._icon_mgr = icon_mgr
+        self.root.bind('<Configure>', self._on_configure)
 
     def _on_configure(self, event):
         if self._icon_mgr is None:
             return
+        print("[DEBUG] _on_configure fired")
         if self._debounce_id:
             self.root.after_cancel(self._debounce_id)
         self._debounce_id = self.root.after(500, self._on_drag_end)
 
     def _on_drag_end(self):
         """拖动停止后触发：将图标排列到窗口客户区下方并强制重绘"""
+        print("[DEBUG] _on_drag_end fired")
         if self._icon_mgr is None:
             return
         wx, wy = self._get_window_pos()
