@@ -24,9 +24,10 @@ TEXTS = {
         "progress_4": "整理完成",
         "done_label": "整理完成！桌面已清理，共计 {count} 个图标已被收容。",
         "auto_arrange_warn": (
-            '请先关闭桌面的"自动排列图标"和"将图标与网格对齐"后再使用本软件。\n\n'
-            '方法：桌面空白处右键 → 查看 → 取消勾选"自动排列图标"和"将图标与网格对齐"'
+            '请先关闭桌面的"自动排列图标"后再使用本软件。\n\n'
+            '方法：桌面空白处右键 → 查看 → 取消勾选"自动排列图标"'
         ),
+        "align_grid_hint": "提示：关闭「将图标与网格对齐」可获得最佳效果",
         "no_desktop": "无法访问桌面图标，程序即将退出。",
         "menu_lang": "语言",
         "menu_lang_zh": "简体中文",
@@ -42,9 +43,10 @@ TEXTS = {
         "progress_4": "Tidying complete!",
         "done_label": "Tidying complete! {count} icons have been contained.",
         "auto_arrange_warn": (
-            'Please disable "Auto arrange icons" and "Align icons to grid" before using this software.\n\n'
-            'How: Right-click desktop → View → Uncheck "Auto arrange icons" and "Align icons to grid"'
+            'Please disable "Auto arrange icons" before using this software.\n\n'
+            'How: Right-click desktop → View → Uncheck "Auto arrange icons"'
         ),
+        "align_grid_hint": 'Tip: Disable "Align icons to grid" for best results',
         "no_desktop": "Cannot access desktop icons. The program will exit.",
         "menu_lang": "Language",
         "menu_lang_zh": "简体中文",
@@ -437,6 +439,13 @@ class DesktopTidyApp:
         btn.pack()
         self._idle_btn = btn
 
+        # 弱检测提示：网格对齐开启时显示右下角小字
+        if self._check_align_to_grid():
+            hint = ttk.Label(frame, text=self.t("align_grid_hint"),
+                             font=("Microsoft YaHei", 8), foreground="gray")
+            hint.pack(side=tk.BOTTOM, anchor=tk.SE, pady=(10, 0))
+            self._align_hint_label = hint
+
     def _on_start(self):
         """点击开始整理"""
         if self._check_auto_arrange():
@@ -453,8 +462,8 @@ class DesktopTidyApp:
         self._rebuild_ui()
         self._start_progress()
 
-    def _check_auto_arrange(self) -> bool:
-        """检查桌面是否开启了自动排列/网格对齐，开启则弹窗返回 True"""
+    def _get_desktop_fflags(self) -> int | None:
+        """读取桌面 FFlags 注册表值，失败返回 None"""
         try:
             key = winreg.OpenKey(
                 winreg.HKEY_CURRENT_USER,
@@ -462,16 +471,25 @@ class DesktopTidyApp:
             )
             fflags, _ = winreg.QueryValueEx(key, "FFlags")
             winreg.CloseKey(key)
-            if fflags & 0x1 or fflags & 0x2:
-                messagebox.showwarning(
-                    self.t("window_title"),
-                    self.t("auto_arrange_warn")
-                )
-                return True
+            return fflags
         except (FileNotFoundError, OSError, TypeError):
-            # 注册表键不存在、无法访问或值类型不匹配，忽略
-            pass
+            return None
+
+    def _check_auto_arrange(self) -> bool:
+        """强检测：自动排列图标开启则弹窗并返回 True"""
+        fflags = self._get_desktop_fflags()
+        if fflags is not None and fflags & 0x1:
+            messagebox.showwarning(
+                self.t("window_title"),
+                self.t("auto_arrange_warn")
+            )
+            return True
         return False
+
+    def _check_align_to_grid(self) -> bool:
+        """弱检测：网格对齐开启返回 True（不弹窗，仅显示提示）"""
+        fflags = self._get_desktop_fflags()
+        return fflags is not None and bool(fflags & 0x2)
 
     # ── PROGRESS 视图 ──
     def _build_progress_view(self):
