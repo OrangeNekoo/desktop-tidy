@@ -415,14 +415,14 @@ class DesktopTidyApp:
             )
             fflags, _ = winreg.QueryValueEx(key, "FFlags")
             winreg.CloseKey(key)
-            if fflags & 0x4 or fflags & 0x20:
+            if fflags & 0x1 or fflags & 0x2:
                 messagebox.showwarning(
                     self.t("window_title"),
                     self.t("auto_arrange_warn")
                 )
                 return True
-        except (FileNotFoundError, OSError):
-            # 注册表键不存在或无法访问，忽略
+        except (FileNotFoundError, OSError, TypeError):
+            # 注册表键不存在、无法访问或值类型不匹配，忽略
             pass
         return False
 
