@@ -273,6 +273,13 @@ class WindowController:
             self.root.after(2, self.root.lift)
 
 
+    def _get_window_pos(self) -> tuple[int, int]:
+        """通过 Win32 API 获取窗口实际屏幕坐标（比 winfo_x/y 更准确）"""
+        hwnd = int(self.root.frame(), 16)
+        rect = wintypes.RECT()
+        ctypes.windll.user32.GetWindowRect(hwnd, ctypes.byref(rect))
+        return (rect.left, rect.top)
+
     def cancel_debounce(self):
         """取消防抖定时器（供 DesktopTidyApp 在 resize 前调用）"""
         if self._debounce_id:
@@ -288,23 +295,23 @@ class WindowController:
             return
         if self._debounce_id:
             self.root.after_cancel(self._debounce_id)
-        self._debounce_id = self.root.after(300, self._on_drag_end)
+        self._debounce_id = self.root.after(500, self._on_drag_end)
 
     def _on_drag_end(self):
-        """拖动停止 300ms 后触发：将图标排列到窗口客户区下方"""
+        """拖动停止后触发：将图标排列到窗口客户区下方"""
         if self._icon_mgr is None:
             return
-        x = self.root.winfo_x() + self._border_x
-        y = self.root.winfo_y() + self._border_y
+        wx, wy = self._get_window_pos()
+        x = wx + self._border_x
+        y = wy + self._border_y
         self._icon_mgr.arrange_grid(x, y)
 
     def resize_to_cover(self, grid_w: int, grid_h: int):
         """调整窗口大小以覆盖图标网格（含边框），保持左上角不变"""
-        x = self.root.winfo_x()
-        y = self.root.winfo_y()
+        wx, wy = self._get_window_pos()
         total_w = grid_w + self._border_x + self._border_r
         total_h = grid_h + self._border_y + self._border_b
-        self.root.geometry(f'{total_w}x{total_h}+{x}+{y}')
+        self.root.geometry(f'{total_w}x{total_h}+{wx}+{wy}')
 
 # ── GUI 主应用 ──
 class DesktopTidyApp:
@@ -339,7 +346,7 @@ class DesktopTidyApp:
         # 构建 UI
         self._build_menu()
         self._build_idle_view()
-        self._center_window(400, 200)
+        self._center_window(500, 250)
 
     def t(self, key: str, **fmt) -> str:
         """获取当前语言的文本，缺失 key 时回退到 key 本身"""
@@ -517,8 +524,9 @@ class DesktopTidyApp:
         """将图标排列到窗口客户区下方并调整窗口大小"""
         # 重新测量边框（首次调用时窗口装饰可能尚未完全创建）
         self.win_ctrl._measure_borders()
-        x = self.root.winfo_x() + self.win_ctrl._border_x
-        y = self.root.winfo_y() + self.win_ctrl._border_y
+        wx, wy = self.win_ctrl._get_window_pos()
+        x = wx + self.win_ctrl._border_x
+        y = wy + self.win_ctrl._border_y
 
         grid_w, grid_h = self.icon_mgr.arrange_grid(x, y)
 
