@@ -276,9 +276,6 @@ class WindowController:
         if event.widget is self.root and self.root.state() == 'iconic':
             self.root.after(1, self.root.deiconify)
             self.root.after(2, self.root.lift)
-            # 恢复后重新激活拖动跟随（最小化可能导致绑定丢失）
-            if self._icon_mgr is not None:
-                self.root.after(10, lambda mgr=self._icon_mgr: self.enable_drag_follow(mgr))
     def _get_window_pos(self) -> tuple[int, int]:
         """通过 Win32 API 获取窗口实际屏幕坐标（比 winfo_x/y 更准确）"""
         hwnd = int(self.root.frame(), 16)
@@ -293,21 +290,25 @@ class WindowController:
             self._debounce_id = None
 
     def enable_drag_follow(self, icon_mgr):
-        """启用拖动完成后图标跟随"""
+        """启用拖动完成后图标跟随（轮询检测窗口位置变化）"""
         self._icon_mgr = icon_mgr
-        self.root.bind('<Configure>', self._on_configure)
+        self._last_x, self._last_y = self._get_window_pos()
+        self._poll_drag()
 
-    def _on_configure(self, event):
+    def _poll_drag(self):
+        """每 200ms 检测窗口是否移动"""
         if self._icon_mgr is None:
             return
-        print("[DEBUG] _on_configure fired")
-        if self._debounce_id:
-            self.root.after_cancel(self._debounce_id)
-        self._debounce_id = self.root.after(500, self._on_drag_end)
+        x, y = self._get_window_pos()
+        if (x, y) != (self._last_x, self._last_y):
+            self._last_x, self._last_y = x, y
+            if self._debounce_id:
+                self.root.after_cancel(self._debounce_id)
+            self._debounce_id = self.root.after(500, self._on_drag_end)
+        self.root.after(200, self._poll_drag)
 
     def _on_drag_end(self):
         """拖动停止后触发：将图标排列到窗口客户区下方并强制重绘"""
-        print("[DEBUG] _on_drag_end fired")
         if self._icon_mgr is None:
             return
         wx, wy = self._get_window_pos()
